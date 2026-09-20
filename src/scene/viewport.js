@@ -32,9 +32,10 @@ export function createViewport(container) {
   const target = new Vector3(0, 0, 0)
   camera.lookAt(target)
 
-  // Bounding box the camera must keep in shot, in world units. Set by the
+  // What the camera must keep in shot: the graph's own extent in world units,
+  // plus room for the projected HTML labels expressed in pixels. Set by the
   // scene once the graph is laid out; see `setFraming`.
-  let framing = { width: 14, height: 5 }
+  let framing = { width: 14, height: 5, reserveX: 200, reserveY: 104 }
 
   const renderer = new WebGLRenderer({ antialias: true })
   // Beyond 2x the extra fragments cost far more than they show.
@@ -65,6 +66,7 @@ export function createViewport(container) {
   timer.connect(document)
 
   const updaters = new Set()
+  const resizeHandlers = new Set()
 
   function resize() {
     const { clientWidth: width, clientHeight: height } = container
@@ -78,6 +80,8 @@ export function createViewport(container) {
     renderer.setSize(width, height)
     composer.setSize(width, height)
     bloom.resolution.set(width, height)
+
+    for (const handler of resizeHandlers) handler(width, height)
   }
 
   /**
@@ -86,10 +90,23 @@ export function createViewport(container) {
    * cannot crop a node off the edge.
    */
   function fitCamera() {
+    const width = container.clientWidth
+    const height = container.clientHeight
     const halfFov = (camera.fov * Math.PI) / 360
-    const forHeight = framing.height / 2 / Math.tan(halfFov)
-    const forWidth = framing.width / 2 / (Math.tan(halfFov) * camera.aspect)
-    camera.position.z = Math.max(forHeight, forWidth) * 1.1
+
+    // The labels are HTML at a fixed pixel size and do not scale with the
+    // camera, so the room they need is reserved in pixels rather than in world
+    // units. Reserving it in world units is what let the bottom label fall off
+    // a short screen: the same world padding buys fewer and fewer pixels the
+    // smaller the viewport gets, which is exactly backwards.
+    const usableW = Math.max(width - framing.reserveX, width * 0.45)
+    const usableH = Math.max(height - framing.reserveY, height * 0.45)
+
+    const forHeight = ((framing.height * height) / usableH) / 2 / Math.tan(halfFov)
+    const forWidth =
+      ((framing.width * width) / usableW) / 2 / (Math.tan(halfFov) * camera.aspect)
+
+    camera.position.z = Math.max(forHeight, forWidth) * 1.02
     camera.lookAt(target)
     camera.updateProjectionMatrix()
   }
@@ -114,6 +131,16 @@ export function createViewport(container) {
     camera,
     renderer,
     reducedMotion: prefersReducedMotion,
+
+    /**
+     * Called with the container's pixel size whenever it changes. Layout that
+     * depends on the shape of the viewport listens here rather than to a CSS
+     * breakpoint, so it reacts to the box it is actually drawn into.
+     */
+    onResize(handler) {
+      resizeHandlers.add(handler)
+      return () => resizeHandlers.delete(handler)
+    },
 
     /** Register a per-frame callback. Returns an unsubscribe function. */
     onFrame(update) {

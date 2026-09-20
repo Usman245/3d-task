@@ -37,13 +37,33 @@ const agentNames = new Map(AGENTS.map((agent) => [agent.id, agent.name]))
 const sim = createSimulation()
 
 // --------------------------------------------------------------------- scene
-const layout = computeLayout()
 const viewport = createViewport(el('viewport'))
-const nodes = createNodes(layout)
-const edges = createEdges((agentId) => nodes.positionOf(agentId))
+
+let orientation = orientationFor(el('stage'))
+const initialLayout = computeLayout(orientation)
+
+const nodes = createNodes(initialLayout, orientation)
+const edges = createEdges((agentId) => nodes.positionOf(agentId), orientation)
 
 viewport.scene.add(createBackdrop(), ...createLights(), edges.group, nodes.group)
-viewport.setFraming(framingFor(layout))
+viewport.setFraming(framingFor(initialLayout, orientation))
+
+// The graph re-flows when the viewport becomes taller than it is wide, which is
+// what a phone in portrait gives us. Driven by the measured box rather than a
+// CSS breakpoint, so it also covers a narrow desktop window or a split screen.
+// Cards keep their state across the switch: state lives in each node, not in
+// its position, so a run in progress simply carries on along the new path.
+viewport.onResize(() => {
+  const next = orientationFor(el('stage'))
+  if (next === orientation) return
+  orientation = next
+
+  const layout = computeLayout(next)
+  nodes.setLayout(layout, next)
+  edges.setLayout((agentId) => nodes.positionOf(agentId), next)
+  labels.setCompact(next === 'vertical')
+  viewport.setFraming(framingFor(layout, next))
+})
 
 // ------------------------------------------------------------------------ ui
 const roster = createRoster(el('roster'), el('roster-count'))
@@ -55,6 +75,8 @@ const runBar = createRunBar({
   elapsedEl: el('run-elapsed'),
   progressEl: el('run-progress'),
 })
+
+labels.setCompact(orientation === 'vertical')
 
 if (prefersReducedMotion) document.body.classList.add('reduce-motion')
 
@@ -137,14 +159,34 @@ if (import.meta.hot) {
   })
 }
 
+/**
+ * Lay the pipeline out along whichever axis the viewport actually has room for.
+ * The threshold sits slightly above square so a near-square box keeps the
+ * left-to-right reading order, which is the more natural one for a pipeline.
+ */
+function orientationFor(stage) {
+  return stage.clientWidth / Math.max(stage.clientHeight, 1) < 1.15
+    ? 'vertical'
+    : 'horizontal'
+}
+
 /** World-space box the camera must keep in shot, derived from the layout. */
-function framingFor(positions) {
+function framingFor(positions, flow) {
   const xs = [...positions.values()].map((p) => p.x)
   const ys = [...positions.values()].map((p) => p.y)
-  const pad = CARD.width / 2 + 0.7
+  const vertical = flow === 'vertical'
 
   return {
-    width: Math.max(...xs) - Math.min(...xs) + pad * 2,
-    height: Math.max(...ys) - Math.min(...ys) + pad * 2,
+    // The graph's own extent, cards included, in world units.
+    width: Math.max(...xs) - Math.min(...xs) + CARD.width,
+    height: Math.max(...ys) - Math.min(...ys) + CARD.height,
+
+    // Pixel room for the label hanging under each card, plus surrounding air.
+    // Stacked, width is the scarce axis and there is height to give away; side
+    // by side it is the other way round. The vertical figure is the smallest
+    // that never clips the bottom label on a 320x568 screen — anything larger
+    // is scale taken off the cards for nothing.
+    reserveX: vertical ? 44 : 170,
+    reserveY: vertical ? 72 : 88,
   }
 }

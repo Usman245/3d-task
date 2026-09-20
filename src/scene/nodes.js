@@ -3,7 +3,6 @@ import {
   CircleGeometry,
   Color,
   DoubleSide,
-  ExtrudeGeometry,
   Float32BufferAttribute,
   Group,
   Line,
@@ -13,6 +12,7 @@ import {
   MeshStandardMaterial,
   PlaneGeometry,
   Shape,
+  ShapeGeometry,
 } from 'three'
 import { STATE_COLORS, SURFACE_COLORS } from '../tokens.js'
 import { createIconTexture } from './icons.js'
@@ -35,13 +35,22 @@ import { createIconTexture } from './icons.js'
  *   ports    — the small circles the edges dock into
  */
 
-export const CARD = { width: 1.62, height: 1.24, radius: 0.3, depth: 0.14 }
+export const CARD = { width: 1.62, height: 1.24, radius: 0.3 }
 
-const BEVEL = 0.02
-// Everything drawn on the card's face must clear the extrude's bevel, which
-// pushes the front surface a further `BEVEL` beyond half the depth. Sitting at
-// depth/2 buries the icon and the border inside the plate.
-const FACE_Z = CARD.depth / 2 + BEVEL
+/**
+ * The card is flat, not an extruded box.
+ *
+ * An extruded card has side walls, and under perspective every card off the
+ * centre axis shows the wall on its inward-facing side. Worse, the border is
+ * drawn on the front face, so it projects inset from the card's silhouette —
+ * which reads as a second border running through the body of the node rather
+ * than as depth. Flattening the card makes the border and the silhouette the
+ * same edge at every position on screen.
+ *
+ * Depth in this scene comes from the layout, the camera and the backdrop, none
+ * of which can misalign an outline.
+ */
+const LAYER = 0.004
 
 const OUTLINE_POINTS = 168
 const BEAM_POINTS = 30
@@ -56,18 +65,29 @@ const beamGeometry = toLineGeometry([...outlinePath, ...outlinePath])
 const iconGeometry = new PlaneGeometry(0.56, 0.56)
 const portGeometry = new CircleGeometry(0.055, 16)
 
-export function createNodes(positions) {
+export function createNodes(positions, orientation) {
   const group = new Group()
   const nodes = new Map()
 
-  for (const [agentId, position] of positions) {
-    const node = createNode(agentId, position)
+  for (const agentId of positions.keys()) {
+    const node = createNode(agentId)
     nodes.set(agentId, node)
     group.add(node.group)
   }
 
-  return {
+  const api = {
     group,
+
+    /**
+     * Move every card, and swap which edges the ports sit on. Called again
+     * whenever the viewport changes orientation; the cards keep their state,
+     * because state lives in each node's closure and not in its position.
+     */
+    setLayout(next, nextOrientation) {
+      for (const [agentId, position] of next) {
+        nodes.get(agentId).place(position, nextOrientation)
+      }
+    },
 
     setState(agentId, state) {
       nodes.get(agentId).setState(state)
@@ -91,11 +111,13 @@ export function createNodes(positions) {
       portGeometry.dispose()
     },
   }
+
+  api.setLayout(positions, orientation)
+  return api
 }
 
-function createNode(agentId, position) {
+function createNode(agentId) {
   const group = new Group()
-  group.position.set(position.x, position.y, 0)
 
   const surfaceMaterial = new MeshStandardMaterial({
     color: new Color(SURFACE_COLORS.raised),
@@ -137,14 +159,12 @@ function createNode(agentId, position) {
   const beam = new Line(beamGeometry, beamMaterial)
   const icon = new Mesh(iconGeometry, iconMaterial)
 
-  border.position.z = FACE_Z + 0.004
-  beam.position.z = FACE_Z + 0.006
-  icon.position.z = FACE_Z + 0.012
+  border.position.z = LAYER
+  beam.position.z = LAYER * 2
+  icon.position.z = LAYER * 3
 
   const portIn = new Mesh(portGeometry, portMaterial)
   const portOut = new Mesh(portGeometry, portMaterial)
-  portIn.position.set(-CARD.width / 2, 0, FACE_Z + 0.004)
-  portOut.position.set(CARD.width / 2, 0, FACE_Z + 0.004)
 
   group.add(surface, border, beam, icon, portIn, portOut)
 
@@ -154,6 +174,19 @@ function createNode(agentId, position) {
 
   return {
     group,
+
+    /** Position the card and dock its ports on the sides the flow uses. */
+    place(position, orientation) {
+      group.position.set(position.x, position.y, 0)
+
+      if (orientation === 'horizontal') {
+        portIn.position.set(-CARD.width / 2, 0, LAYER)
+        portOut.position.set(CARD.width / 2, 0, LAYER)
+      } else {
+        portIn.position.set(0, CARD.height / 2, LAYER)
+        portOut.position.set(0, -CARD.height / 2, LAYER)
+      }
+    },
 
     setState(next) {
       state = next
@@ -229,19 +262,9 @@ function createNode(agentId, position) {
   }
 }
 
-/** Rounded rectangle, extruded just enough to catch the key light on its edge. */
+/** Flat rounded rectangle. See the note on CARD for why it is not extruded. */
 function buildCardGeometry() {
-  const geometry = new ExtrudeGeometry(roundedRectShape(), {
-    depth: CARD.depth,
-    bevelEnabled: true,
-    bevelThickness: BEVEL,
-    bevelSize: BEVEL,
-    bevelSegments: 2,
-    curveSegments: 12,
-  })
-  // ExtrudeGeometry builds from z=0 forward; centre it on the node's origin.
-  geometry.translate(0, 0, -CARD.depth / 2)
-  return geometry
+  return new ShapeGeometry(roundedRectShape(), 12)
 }
 
 function roundedRectShape() {
