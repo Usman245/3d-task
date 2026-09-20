@@ -1,0 +1,74 @@
+@import "tailwindcss";
+
+/*
+ * Single source of truth for the palette.
+ *
+ * These become Tailwind utilities (`text-state-running`, `border-surface-line`,
+ * …) and are read back out in JS by `src/tokens.js` for the Three.js
+ * materials. A state can therefore never be one colour in the panel and a
+ * different one in the scene.
+ */
+@theme {
+  --color-surface-void: #08090c;
+  --color-surface-panel: #0c0e13;
+  --color-surface-raised: #11141b;
+  --color-surface-line: #1e222c;
+  /* Backdrop dots and edge lines sit a step lighter than the panel chrome, so
+     the canvas reads as a workspace rather than an empty void. */
+  --color-surface-grid: #39435a;
+  --color-surface-edge: #414d63;
+  --color-surface-port: #3f4a5e;
+
+  --color-ink-bright: #e4e7ee;
+  --color-ink-base: #949cad;
+  --color-ink-dim: #5b6373;
+  --color-ink-faint: #39404e;
+
+  --color-state-pending: #5b6373;
+  --color-state-running: #f0a02c;
+  --color-state-completed: #35c88a;
+  --color-state-failed: #e8544a;
+
+  --font-mono: "JetBrains Mono", ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+}
+
+html,
+body {
+  height: 100%;
+}
+
+body {
+  overflow: hidden;
+  background-color: var(--color-surface-void);
+}
+
+canvas {
+  display: block;
+}
+
+/* Thin, unobtrusive scrollbar — the default is far too heavy for a dense panel. */
+.scroll-thin {
+  scrollbar-width: thin;
+  scrollbar-color: var(--color-surface-line) transparent;
+}
+.scroll-thin::-webkit-scrollbar {
+  width: 6px;
+}
+.scroll-thin::-webkit-scrollbar-thumb {
+  background: var(--color-surface-line);
+}
+
+/* Used by the running-state dot in the panel. Paused with the simulation via
+   a class on <body>, so the UI and the scene freeze together. */
+@keyframes state-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.25; }
+}
+.animate-state-pulse {
+  animation: state-pulse 1.1s ease-in-out infinite;
+}
+
+body.is-paused .animate-state-pulse,
+body.reduce-motion .animate-state-pulse {
+  animation: none;
+}

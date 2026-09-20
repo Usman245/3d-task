@@ -1,0 +1,126 @@
+<!doctype html>
+<html lang="en" class="h-full">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Agent Activity</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600&display=swap"
+      rel="stylesheet"
+    />
+  </head>
+  <body class="h-full bg-surface-void font-mono text-ink-base antialiased">
+    <div class="flex h-full flex-col">
+      <!-- Top bar -->
+      <header
+        class="flex h-11 shrink-0 items-center justify-between border-b border-surface-line px-4"
+      >
+        <div class="flex items-baseline gap-3">
+          <span class="text-[13px] font-semibold tracking-tight text-ink-bright">
+            agent&#8203;·activity
+          </span>
+          <span class="text-[10px] tracking-[0.18em] text-ink-faint uppercase">
+            orchestrator / mock stream
+          </span>
+        </div>
+
+        <div class="flex items-center gap-2">
+          <span
+            id="connection"
+            class="flex items-center gap-1.5 text-[10px] tracking-[0.14em] text-ink-dim uppercase"
+          >
+            <span
+              class="size-1.5 rounded-full bg-state-completed animate-state-pulse"
+            ></span>
+            streaming
+          </span>
+          <button
+            id="toggle-pause"
+            type="button"
+            class="h-6 border border-surface-line px-2.5 text-[10px] tracking-[0.14em] text-ink-base uppercase transition hover:border-ink-faint hover:text-ink-bright focus:outline-none focus-visible:ring-1 focus-visible:ring-ink-dim"
+          >
+            pause
+          </button>
+        </div>
+      </header>
+
+      <main class="flex min-h-0 flex-1">
+        <!-- 3D viewport. Agent labels are HTML, projected onto the node positions. -->
+        <section id="stage" class="relative min-w-0 flex-1 overflow-hidden">
+          <div id="viewport" class="absolute inset-0"></div>
+          <div id="labels" class="pointer-events-none absolute inset-0"></div>
+
+          <div
+            class="pointer-events-none absolute bottom-3 left-4 text-[10px] tracking-[0.14em] text-ink-faint uppercase"
+          >
+            dag / 6 agents / 6 edges
+          </div>
+        </section>
+
+        <!-- Status panel -->
+        <aside
+          class="flex w-105 shrink-0 flex-col border-l border-surface-line bg-surface-panel"
+        >
+          <!-- Run header -->
+          <div class="shrink-0 border-b border-surface-line px-4 py-3">
+            <div class="flex items-center justify-between">
+              <span
+                id="run-id"
+                class="text-[11px] font-medium text-ink-bright tabular-nums"
+                >run —</span
+              >
+              <span
+                id="run-status"
+                class="text-[10px] tracking-[0.14em] text-ink-dim uppercase"
+                >idle</span
+              >
+            </div>
+            <div
+              class="mt-2 flex items-baseline justify-between text-[10px] text-ink-dim"
+            >
+              <span class="tracking-[0.14em] uppercase">elapsed</span>
+              <span id="run-elapsed" class="text-ink-base tabular-nums">0.00s</span>
+            </div>
+            <!-- Completion bar: agents terminal / total. -->
+            <div class="mt-2 h-px w-full bg-surface-line">
+              <div
+                id="run-progress"
+                class="h-px w-0 bg-state-running transition-[width] duration-300"
+              ></div>
+            </div>
+          </div>
+
+          <!-- Agent roster -->
+          <div class="shrink-0 border-b border-surface-line">
+            <div
+              class="flex items-center justify-between px-4 pt-3 pb-2 text-[10px] tracking-[0.18em] text-ink-faint uppercase"
+            >
+              <span>agents</span>
+              <span id="roster-count" class="tabular-nums">0/6</span>
+            </div>
+            <ul id="roster" class="pb-1"></ul>
+          </div>
+
+          <!-- Live log -->
+          <div class="flex min-h-0 flex-1 flex-col">
+            <div
+              class="flex shrink-0 items-center justify-between px-4 pt-3 pb-2 text-[10px] tracking-[0.18em] text-ink-faint uppercase"
+            >
+              <span>event log</span>
+              <span id="log-count" class="tabular-nums">0</span>
+            </div>
+            <ol
+              id="log"
+              class="scroll-thin min-h-0 flex-1 overflow-y-auto px-4 pb-3 text-[11px] leading-[1.45]"
+            ></ol>
+          </div>
+        </aside>
+      </main>
+    </div>
+
+    <script type="module" src="/src/main.js"></script>
+  </body>
+</html>
